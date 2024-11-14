@@ -1,6 +1,6 @@
 import os
 import random
-from tkinter import Tk, Button, Label, StringVar, Entry, IntVar
+from tkinter import Frame, OptionMenu, Radiobutton, Scale, Tk, Button, Label, StringVar, Entry, IntVar
 from PIL import Image, ImageTk
 
 # Question and answer directories
@@ -37,7 +37,19 @@ def show_question():
     question_file = get_random_question()
     question_path = os.path.join(question_dir if question_file in question_files else chiffres_dir, question_file)
     question_img = Image.open(question_path)
-    question_img.thumbnail((600, 600))  # Resize for display
+
+    window_width = root.winfo_width()
+    window_height = root.winfo_height()
+
+    scale_percentage = 0.35
+
+    new_width = int(window_width * scale_percentage)
+    new_height = int(window_height * scale_percentage)
+
+    if new_width <= 0 or new_height <= 0:
+        new_width, new_height = 400, 400  
+    
+    question_img.thumbnail((new_width, new_height))
     question_image = ImageTk.PhotoImage(question_img)
 
     question_label.config(image=question_image)
@@ -56,60 +68,67 @@ def show_question():
 # Toggle between True/False and numeric entry modes
 def toggle_answer_mode():
     if numeric_mode:
-        true_button.place_forget()
-        false_button.place_forget()
-        cheat_button.place_forget() 
+        radio_frame.pack_forget() 
+        cheat_button.place_forget()
         number_entry.place(relx=0.5, rely=0.8, anchor="center")
     else:
         number_entry.place_forget()
-        true_button.place(relx=0.4, rely=0.8, anchor="center")
-        false_button.place(relx=0.6, rely=0.8, anchor="center")
+        radio_frame.pack(pady=10)  
         cheat_button.place(relx=0.5, rely=0.9, anchor="center")
 
 # Check the answer (True/False or numeric)
-def check_answer(is_true=None):
+def check_answer(t=None):
     question_file = current_question.get()
 
     if numeric_mode:
         # Numeric answer check
         correct_answer = int(question_file.split('_')[1].split('.png')[0])
-        user_answer = int(number_var.get())
-        is_correct = (user_answer == correct_answer)
+        user_answer = number_var.get()
+        if user_answer == "":
+            global score
+            score += 0.2
+            is_correct = False
+        else:
+            user_answer = int(user_answer)
+            is_correct = (user_answer == correct_answer)
     else:
         # True/False answer check
         question_num = question_file.split("question")[1].split(".png")[0]
-        correct_answer_file = f"reponse{question_num}_{'1' if is_true else '0'}.png"
+        correct_answer_file = f"reponse{question_num}_1.png"
         correct_answer_path = os.path.join(response_dir, correct_answer_file)
         is_correct = os.path.exists(correct_answer_path)
 
-    result = "Correct!" if is_correct else "Incorrect. Here is the solution"
-    previous_result.set(f"Previous answer: {result}")
     update_score(is_correct)
 
     show_question()
 
 # Update the score
 def update_score(is_correct):
-    cheat_result.set("Cheat: ")
+    cheat_result.set("")
     cheat_label.config(image=None)
     cheat_label.image = None
 
-    global score, total
-    if is_correct:
-        score += 1
-    else:
-        global numeric_mode
-        score -= 3
-        if not numeric_mode:
+    global score, total, numeric_mode
+    user_confidence = confidence_value.get() / 100
+
+    if not numeric_mode:
+        if is_correct:
+            question_score = (1/5) * (8 * (1 - 2 * (1 - user_confidence)**2) - 3)
+        else:
+            question_score = (1/5) * (8 * (1 - 2 * user_confidence**2) - 3)
+        if(question_score != 1):
             show_cheat()
+        score += question_score
+    else:
+        if(is_correct):
+            score += 1
         else:
             question_file = current_question.get()
             correct_answer = int(question_file.split('_')[1].split('.png')[0])
             previous_result.set(f"Incorrect. Here is the solution: {correct_answer}")
-    if numeric_mode:
         number_var.set("")
     total += 1
-    score_label.config(text=f"Score: {score} / {total}")
+    score_label.config(text=f"Score: {round(score,2)} / {total}")
 
 # Show the cheat answer (image and text)
 def show_cheat():
@@ -120,42 +139,25 @@ def show_cheat():
 
     if os.path.exists(correct_answer_path):
         answer_img = Image.open(correct_answer_path)
-        cheat_result.set("Cheat: The answer is True")
     else:
         answer_img = Image.open(os.path.join(response_dir,f"reponse{question_num}_0.png"))
-        cheat_result.set("Cheat: The answer is False")
 
-    answer_img.thumbnail((600, 600))  # Resize for display
+    window_width = root.winfo_width()
+    window_height = root.winfo_height()
+
+    scale_percentage = 0.40
+
+    new_width = int(window_width * scale_percentage)
+    new_height = int(window_height * scale_percentage)
+
+    if new_width <= 0 or new_height <= 0:
+        new_width, new_height = 400, 400  
+    
+
+    answer_img.thumbnail((new_width, new_height))
     answer_image = ImageTk.PhotoImage(answer_img)
     cheat_label.config(image=answer_image)
     cheat_label.image = answer_image
-
-# Navigate with arrow keys (left/right)
-def navigate(event):
-    global selected_button
-    if event.keysym == "Left":
-        selected_button = false_button
-    elif event.keysym == "Right":
-        selected_button = true_button
-    update_button_highlight()
-
-# Highlight the selected button
-def update_button_highlight():
-    if selected_button == true_button:
-        true_button.config(bg="darkgreen", fg="white")
-        false_button.config(bg="red", fg="white")
-    else:
-        false_button.config(bg="darkred", fg="white")
-        true_button.config(bg="green", fg="white")
-
-# Select the active button (Enter)
-def select_answer(event):
-    if numeric_mode:
-        check_answer()  # Numeric mode, check with entry
-    elif selected_button == true_button:
-        check_answer(True)
-    else:
-        check_answer(False)
 
 # Create the GUI
 root = Tk()
@@ -172,14 +174,25 @@ score = 0
 total = 0
 
 # Numeric entry variable
-number_var = IntVar()
+number_var = StringVar()
 
 # Create buttons and labels
 question_label = Label(root)
 question_label.pack(pady=20)
 
-true_button = Button(root, text="True", command=lambda: check_answer(True), width=20, height=2, bg="green", fg="white")
-false_button = Button(root, text="False", command=lambda: check_answer(False), width=20, height=2, bg="red", fg="white")
+radio_frame = Frame(root)
+radio_frame.pack(pady=10)  
+
+confidence_value = IntVar(value=0)
+radio_buttons = []
+for idx, i in enumerate(range(0, 101, 10)):
+    radio_button = Radiobutton(radio_frame, text=f"{i}%", variable=confidence_value, value=i)
+    radio_button.grid(row=1, column=idx, padx=5, pady=10)
+    radio_buttons.append(radio_button)
+
+validate_button = Button(radio_frame, text="Valider", command=check_answer)
+validate_button.grid(row=2, columnspan=len(radio_buttons), pady=10)
+
 number_entry = Entry(root, textvariable=number_var, width=10, font=("Arial", 16))
 
 cheat_button = Button(root, text="Cheat", command=show_cheat, width=20, height=2, bg="yellow", fg="black")
@@ -201,14 +214,8 @@ cheat_result_label.pack()
 # Show the first question
 show_question()
 
-# Key bindings for arrow navigation and selection
-root.bind("<Left>", navigate)
-root.bind("<Right>", navigate)
-root.bind("<Return>", select_answer)
-
-# Initialize button highlight
-selected_button = true_button
-update_button_highlight()
+# Key bindings for selection
+root.bind("<Return>", check_answer)
 
 # Run the application
 root.mainloop()
