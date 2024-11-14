@@ -121,4 +121,4 @@ def extract_question_images(pdf_path):
     doc.close()
 
 # Usage
-extract_question_images("CEC_2024_DM_corr.pdf")
+extract_question_images("CEC_2024_CC2_corr_Math__Feld_.pdf")
